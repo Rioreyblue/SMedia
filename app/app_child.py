@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from sqlalchemy import select
 from app.images import imagekit
-from imagekitio.models.UploadFileRequestOptions import UploadFileRequestOptions
+# from imagekitio.models import UploadFileRequestOptions
+from imagekitio.models.options.UploadFileRequestOptions import UploadFileRequestOptions
 
 import shutil
 import os
@@ -25,11 +26,11 @@ async def upload_file(
     caption: str = Form(""),    
     session: AsyncSession = Depends(get_async_session)
 ):
-    temp_file_path =  none
+    temp_file_path =  None
     
     #Region "Create Temporary file"
     try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splittext(file.filename)[1]) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
             temp_file_path = temp_file.name
             shutil.copyfileobj(file.file, temp_file)
         
@@ -60,13 +61,13 @@ async def upload_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
-        if temp_file_path and os.path.exist(temp_file_path):
+        if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
         file.file.close()    
 
 @ReyApp.get("/feed")
 async def get_feed(
-    session: AsyncSession = Depends(get_async_session)
+        session: AsyncSession = Depends(get_async_session)
 ):
     result = await session.execute(select(Post).order_by(Post.created_at.desc()))
     Post = [row[0] for row in result.all()]
@@ -83,4 +84,4 @@ async def get_feed(
             }
         )
         
-    return {"post": posts_data}
+    return {"posts": posts_data}
