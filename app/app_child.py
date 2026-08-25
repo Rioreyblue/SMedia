@@ -5,8 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from sqlalchemy import select
 from app.images import imagekit
-# from imagekitio.models import UploadFileRequestOptions
-from imagekitio.models.options.UploadFileRequestOptions import UploadFileRequestOptions
 
 import shutil
 import os
@@ -35,23 +33,21 @@ async def upload_file(
             shutil.copyfileobj(file.file, temp_file)
         
         # uploaded
-        upload_result = imagekit.upload_file(
+        upload_result = imagekit.files.upload(
             file=open(temp_file_path, "rb"),
             file_name=file.filename,
-            options=UploadFileRequestOptions(
-                use_unique_file_name=True,
-                tags=["backend-upload"]
-            )
+            use_unique_file_name=True,
+            tags=["backend-upload"]
         )
         #End Region
         
         #proceed if successful
-        if upload_result.response.http_status_code == 200:
+        if upload_result and upload_result.url:
             post = Post(
                 caption=caption,
-                url="upload_result.url",
-                file_type="video" if file.content_type.startswith("video/") else "image",
-                file_name="upload_result.name"
+                url=upload_result.url,
+                file_type="video" if file.content_type and file.content_type.startswith("video/") else "image",
+                file_name=upload_result.name or file.filename
             )
             session.add(post)
             await session.commit()
@@ -70,7 +66,7 @@ async def get_feed(
         session: AsyncSession = Depends(get_async_session)
 ):
     result = await session.execute(select(Post).order_by(Post.created_at.desc()))
-    Post = [row[0] for row in result.all()]
+    posts = result.scalars().all()
     posts_data = []
     for post in posts:
         posts_data.append(
@@ -80,7 +76,7 @@ async def get_feed(
                 "url": post.url,
                 "file_type": post.file_type,
                 "file_name": post.file_name,
-                "created_at":post.created_at.isoformat()
+                "created_at": post.created_at.isoformat() if post.created_at else None
             }
         )
         
